@@ -1,0 +1,31 @@
+{
+  "expo": {
+    "name": "AI Reminder",
+    "slug": "ai-reminder-prototype",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "light",
+    "android": {
+      "package": "com.aireminder.prototype",
+      "permissions": [
+        "android.permission.RECORD_AUDIO",
+        "android.permission.MODIFY_AUDIO_SETTINGS"
+      ]
+    },
+    "plugins": [
+      [
+        "expo-audio",
+        {
+          "microphonePermission": "Allow AI Reminder to record a voice sample.",
+          "enableBackgroundRecording": false,
+          "enableBackgroundPlayback": false
+        }
+      ]
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "dddaf6e3-5abc-4079-8250-1e51a73fe200"
+      }
+    }
+  }
+}
