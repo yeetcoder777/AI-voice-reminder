@@ -37,3 +37,11 @@ Question: if five seconds of incoming speech takes eight seconds to process, wha
 ## Interview explanation
 
 I built an Android-first React Native prototype using Expo development builds. A custom Kotlin module captures mono PCM continuously and emits overlapping windows. A pretrained Sherpa-ONNX speaker model creates embeddings. Enrollment stores a normalized reference vector; verification compares new embeddings using cosine similarity and an adjustable threshold. Matching windows can be replayed locally. I still need to validate device performance and calibrate Hindi/English false accepts and false rejects. Whole-window matching cannot separate simultaneous speakers.
+
+## Build debugging: JavaScript and native compilation are different
+
+The initial EAS failure was in the speaker dependency, not the audio capture module. Its large Kotlin definition() method registered 113 APIs. Expo registration helpers are inlined, so the compiled JVM method exceeded the bytecode limit even though the source was valid Kotlin. The fix moves registrations into 29 ordinary helper methods, keeping each generated method smaller.
+
+TypeScript and Metro validate the JavaScript side; neither compiles this Kotlin file. That is why they could pass while the APK build failed. The postinstall script makes the fix reproducible on a fresh cloud machine instead of relying on a manual node_modules edit.
+
+Interview question: why would increasing build memory or retrying an unchanged build fail to solve a method-size compiler error?

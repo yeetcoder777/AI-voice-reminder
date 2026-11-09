@@ -8,7 +8,8 @@
     "android": "expo run:android",
     "typecheck": "tsc --noEmit",
     "doctor": "npx expo-doctor",
-    "test": "node --test tests/voiceMath.test.cjs"
+    "test": "node --test tests/voiceMath.test.cjs tests/sherpaPatch.test.cjs",
+    "postinstall": "node scripts/fix-sherpa-kotlin.cjs"
   },
   "dependencies": {
     "expo": "~58.0.23",

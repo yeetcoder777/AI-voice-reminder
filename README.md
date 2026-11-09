@@ -62,10 +62,16 @@ The native recorder continues while a window is processed. Only one inference ru
 
 ## Verification status
 
-Dependencies are installed and package-lock.json is included. Passed: TypeScript (tsc --noEmit), all four automated math/WAV tests, Expo Doctor (20/20), native autolinking discovery for voice-capture and expo-sherpa-onnx, and the final Android Metro/Hermes bundle export.
+Dependencies are installed and package-lock.json is included. Passed: TypeScript (tsc --noEmit), all seven automated math/WAV and native-patch tests, Expo Doctor (20/20), native autolinking discovery for voice-capture and expo-sherpa-onnx, and the final Android Metro/Hermes bundle export.
 
 An APK has not been compiled or installed. Native Kotlin compilation, permissions, microphone capture, voice quality, playback, visual layout, and device performance remain unverified until a real Android build and phone test. EAS project/account setup is still required for a cloud build. npm reported five moderate dependency advisories during installation; no breaking force-upgrades were applied.
 
 The pinned expo-sherpa-onnx 0.0.8 wrapper declares itself experimental. Its published package includes the speaker API and Android arm64 library, but Expo SDK 58 compatibility still needs a real build.
 
 References: [Expo development builds](https://docs.expo.dev/develop/development-builds/introduction/), [Expo APK builds](https://docs.expo.dev/build-reference/apk/), [speaker wrapper](https://github.com/tirth0/expo-sherpa-onnx), [Sherpa speaker models](https://k2-fsa.github.io/sherpa/onnx/speaker-identification/).
+
+## Native build fix: Method too large
+
+The first EAS build compiled voice-capture successfully but failed in expo-sherpa-onnx 0.0.8 because ExpoSherpaOnnxModule.definition exceeded the JVM per-method bytecode limit. scripts/fix-sherpa-kotlin.cjs splits its 113 registrations into 29 non-inline helper methods, preserving their order, function bodies and lifecycle cleanup. The npm postinstall hook applies the fix on EAS as well as locally. SHA-256 guards reject unreviewed dependency source changes; repeated installation is safe. Keep scripts/ in the build upload. If upgrading the pinned wrapper, review this patch first.
+
+Regression checks verify the patch is idempotent, rejects unexpected upstream code, and preserves all registration signatures in order. A cloud Android build is still needed to validate native compilation.
