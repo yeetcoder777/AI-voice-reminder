@@ -170,7 +170,7 @@ function Prototype() {
     if (action.current) return;
     action.current = true; setLoading(true); setError('');
     try { await Speaker.initialize(setMessage); setReady(true); setMessage('Voice model ready. All voice matching happens on this phone.'); }
-    catch (e) { setError(String(e)); }
+    catch (e) { setError(String(e)); setMessage('Model setup failed. Retry to download any missing files.'); }
     finally { action.current = false; setLoading(false); }
   }
   async function begin(next: Mode) {
@@ -205,7 +205,7 @@ function Prototype() {
   return <SafeAreaView style={styles.safe}><StatusBar barStyle="dark-content" />
     {active && <KeepRecordingScreenAwake />}
     <ScrollView contentContainerStyle={styles.page}>
-      <View style={styles.header}><Text style={styles.brand}>AI Reminder</Text><Text style={styles.badge}>Voice prototype 0.2</Text></View>
+      <View style={styles.header}><Text style={styles.brand}>AI Reminder</Text><Text style={styles.badge}>Voice prototype 0.2.1</Text></View>
       <Text style={styles.title}>A little less{'\n'}to remember.</Text>
       <Text style={styles.intro}>Start with your voice. Enroll it, then check what the app keeps and what it ignores.</Text>
       <View style={styles.recorder}>
@@ -217,14 +217,14 @@ function Prototype() {
         <View style={styles.track}>{[0, 1, 2].map(i => <View key={i} style={[styles.step, i < enrolled && styles.filled]} />)}</View>
         <Text style={styles.prompt}>{message}</Text>
         {active ? <Button title={stopping ? 'Finishing…' : 'Stop microphone'} disabled={stopping} onPress={() => { void stop(); }} /> : !ready ?
-          <Button title={loading ? 'Preparing model…' : 'Download & load voice model'} disabled={loading} onPress={() => { void load(); }} /> :
+          <Button title={loading ? 'Preparing model…' : error ? 'Retry model setup' : 'Download & load voice model'} disabled={loading} onPress={() => { void load(); }} /> :
           <View style={{ gap: 10 }}>
             <Button title={profile ? 'Start voice test' : 'Enroll my voice'} disabled={loading} onPress={() => { void begin(profile ? 'test' : 'enroll'); }} />
             {profile && <Button title="Record enrollment again" secondary disabled={loading} onPress={() => { void begin('enroll'); }} />}
           </View>}
         <Text style={styles.note}>{profile ? 'Your voice profile is saved locally.' : 'Three samples. About 16 seconds of continuous speech.'}</Text>
       </View>
-      {!!error && <View accessibilityRole="alert" style={styles.error}><Text style={{ color: '#982E35' }}>{error}</Text><Button title="Open app settings" secondary onPress={() => { void Linking.openSettings(); }} /></View>}
+      {!!error && <View accessibilityRole="alert" style={styles.error}><Text style={{ color: '#982E35' }}>{error}</Text>{/permission/i.test(error) && <Button title="Open app settings" secondary onPress={() => { void Linking.openSettings(); }} />}</View>}
       <View style={styles.sectionHeader}><Text style={styles.sectionTitle}>Match sensitivity</Text><Text style={styles.score}>{threshold.toFixed(2)}</Text></View>
       <Text style={styles.muted}>Higher values reject more voices, including some of your own. This starting threshold needs testing.</Text>
       <View style={styles.controls}><Button title="− 0.05" secondary disabled={locked || threshold <= 0.2} onPress={() => changeThreshold(-0.05)} /><Button title="+ 0.05" secondary disabled={locked || threshold >= 0.9} onPress={() => changeThreshold(0.05)} /></View>

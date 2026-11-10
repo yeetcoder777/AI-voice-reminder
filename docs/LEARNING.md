@@ -55,3 +55,11 @@ Capture and inference use different clocks. A bounded promise queue serializes e
 Stop now has two stages: stop acquiring new samples, then drain the processing queue. A final native audio window is returned by stop() when long enough. The screen says it is finishing so the user knows the microphone is off even while inference continues. Enrollment completion deliberately discards its tail. Session IDs prevent results from an old capture being mistaken for a new one.
 
 Try it: record for roughly four seconds, stop, and check whether enough speech is detected for a final match. Then record silence and check that it creates no accepted clip. Finally, change the threshold, restart the app, and verify that the setting was saved. Keep actual results separate from source-level expectations.
+
+## Version 0.2.1: asynchronous operations and mutable file handles
+
+The phone exposed a model-not-found error during setup. The cause was our file-install code: in SDK 58, File.move() is asynchronous and changes the File object's uri after moving it. Starting the move without await let cleanup race it. Cleaning up through the same object after moving could instead delete the installed model.
+
+The fix preserves the original temporary URI as an immutable string, awaits the move, verifies the destination, then cleans only that original temporary path through a fresh File object. Regression tests simulate an asynchronous move that mutates uri and check that both model files survive before native initialization. They also check cached/offline setup and failed download/move cleanup. These tests cover the file-lifecycle bug, not actual Android inference quality.
+
+Interview question: why is adding await alone insufficient if finally still calls delete() on the moved source object?

@@ -1,6 +1,8 @@
-# AI Reminder — voice prototype 0.2
+# AI Reminder — voice prototype 0.2.1
 
 An Android-first Expo / React Native prototype for enrolling one voice and keeping audio windows that match it. No transcription, summaries, tasks, or reminder scheduling yet.
+
+Version 0.2.1 fixes model installation: Expo SDK 58 File.move() returns a promise and changes the source object's URI. Installation now awaits the move, checks the destination file, and cleans only the original temporary path. Version 0.2 could delete or race the downloaded file, producing a native "speaker embedding model not found" error. Install the 0.2.1 APK and retry model setup; no microphone-settings change is required for that error.
 
 ## Run on your Realme
 

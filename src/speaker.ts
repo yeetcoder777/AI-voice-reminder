@@ -15,7 +15,9 @@ const settings = new File(Paths.document, 'voice-settings.json');
 
 async function download(target: File, url: string, bytes: number, label: string, onProgress: (message: string) => void) {
   if (target.exists && target.size === bytes) return;
-  const pending = new File(directory, target.name + '.part');
+  // move() mutates the File object's URI; cleanup must retain the ORIGINAL path.
+  const pendingUri = new File(directory, target.name + '.part').uri;
+  const pending = new File(pendingUri);
   if (pending.exists) pending.delete();
   try {
     const task = LegacyFS.createDownloadResumable(url, pending.uri, {}, progress => {
@@ -25,8 +27,13 @@ async function download(target: File, url: string, bytes: number, label: string,
     const response = await task.downloadAsync();
     if (response?.status !== 200 || pending.size !== bytes) throw new Error(label + ' download incomplete. Check your connection and retry.');
     if (target.exists) target.delete();
-    pending.move(target);
-  } finally { if (pending.exists) pending.delete(); }
+    await pending.move(target);
+    const installed = new File(target.uri);
+    if (!installed.exists || installed.size !== bytes) throw new Error(label + ' could not be installed. Retry model setup.');
+  } finally {
+    const leftover = new File(pendingUri);
+    if (leftover.exists) leftover.delete();
+  }
 }
 
 export async function initialize(onProgress: (message: string) => void) {
