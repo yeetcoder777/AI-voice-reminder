@@ -30,7 +30,7 @@ Question: how would you choose a threshold when false accepts are more costly th
 
 ## 5. Capture and processing happen concurrently
 
-The native thread keeps reading samples while the embedding model processes a previous window. This is producer-consumer architecture. This prototype skips windows if its consumer is busy and shows that count. A production version would use bounded disk buffering and define what to do when the buffer fills.
+The native thread keeps reading samples while the embedding model processes a previous window. This is producer-consumer architecture. Version 0.2 buffers up to four windows including the active one and shows a skipped count only when that limit is reached. A production version would use bounded disk buffering and define what to do when the buffer fills.
 
 Question: if five seconds of incoming speech takes eight seconds to process, what happens during an hour?
 
@@ -45,3 +45,13 @@ The initial EAS failure was in the speaker dependency, not the audio capture mod
 TypeScript and Metro validate the JavaScript side; neither compiles this Kotlin file. That is why they could pass while the APK build failed. The postinstall script makes the fix reproducible on a fresh cloud machine instead of relying on a manual node_modules edit.
 
 Interview question: why would increasing build memory or retrying an unchanged build fail to solve a method-size compiler error?
+
+## Version 0.2: detecting speech and finishing work
+
+Volume and speech are different. A fan can be loud but contain no speech. The inexpensive RMS gate rejects very quiet windows; Silero VAD then identifies speech regions. Only those regions go into the voice embedding, and at least two seconds are required. VAD answers whether speech is present, not whose voice it is. The speaker model still makes the identity decision. VAD is reset per overlapping window so shared samples do not enter its recurrent state twice.
+
+Capture and inference use different clocks. A bounded promise queue serializes expensive inference while capture continues. It holds at most four audio windows; if processing remains slower than capture, it eventually overflows. More queue capacity delays this problem but does not make inference faster. The processing-time readout helps measure this on your phone.
+
+Stop now has two stages: stop acquiring new samples, then drain the processing queue. A final native audio window is returned by stop() when long enough. The screen says it is finishing so the user knows the microphone is off even while inference continues. Enrollment completion deliberately discards its tail. Session IDs prevent results from an old capture being mistaken for a new one.
+
+Try it: record for roughly four seconds, stop, and check whether enough speech is detected for a final match. Then record silence and check that it creates no accepted clip. Finally, change the threshold, restart the app, and verify that the setting was saved. Keep actual results separate from source-level expectations.

@@ -2,12 +2,15 @@ import { useEffect, useRef, useState } from 'react';
 import { AppState, Linking, Pressable, ScrollView, StatusBar, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 import { AudioModule, setAudioModeAsync, useAudioPlayer, useAudioPlayerStatus } from 'expo-audio';
+import { useKeepAwake } from 'expo-keep-awake';
 import Capture, { type AudioChunk } from './modules/voice-capture';
 import * as Speaker from './src/speaker';
 import { centroid, cosine, rms } from './src/voiceMath';
+import { ProcessingQueue } from './src/processingQueue';
 
 type Mode = 'idle' | 'enroll' | 'test';
-type Clip = { uri: string; score: number; sequence: number };
+type Clip = { uri: string; score: number; sequence: number; seconds: number };
+function KeepRecordingScreenAwake() { useKeepAwake(); return null; }
 const prompts = [
   'Speak naturally: describe your morning in Hindi or English.',
   'Keep talking: describe something you need to do tomorrow.',
@@ -24,7 +27,7 @@ function ClipPlayer({ clip, disabled }: { clip: Clip; disabled: boolean }) {
   const status = useAudioPlayerStatus(player);
   useEffect(() => { if (disabled) player.pause(); }, [disabled, player]);
   return <View style={styles.clip}>
-    <View style={{ flex: 1 }}><Text style={styles.label}>Accepted window {clip.sequence + 1}</Text><Text style={styles.muted}>Similarity {clip.score.toFixed(3)} · 6 seconds</Text></View>
+    <View style={{ flex: 1 }}><Text style={styles.label}>Accepted window {clip.sequence + 1}</Text><Text style={styles.muted}>Similarity {clip.score.toFixed(3)} · {clip.seconds.toFixed(1)} seconds</Text></View>
     <Button title={status.playing ? 'Pause' : 'Replay'} secondary disabled={disabled} onPress={() => {
       void (async () => { try { if (status.playing) player.pause(); else { await player.seekTo(0); player.play(); } } catch {} })();
     }} />
@@ -33,6 +36,9 @@ function ClipPlayer({ clip, disabled }: { clip: Clip; disabled: boolean }) {
 function Prototype() {
   const [ready, setReady] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [stopping, setStopping] = useState(false);
+  const [level, setLevel] = useState(0);
+  const [latency, setLatency] = useState<number | null>(null);
   const [mode, setMode] = useState<Mode>('idle');
   const [profile, setProfile] = useState<number[] | null>(null);
   const [enrolled, setEnrolled] = useState(0);
@@ -53,28 +59,52 @@ function Prototype() {
   const mounted = useRef(true);
   const clipList = useRef<Clip[]>([]);
   const started = useRef(0);
+  const captureId = useRef<number | null>(null);
+  const stopTask = useRef<Promise<void> | null>(null);
+  const queue = useRef<ProcessingQueue<AudioChunk> | null>(null);
 
-  async function stop(reason = 'Session stopped. The microphone is off.') {
-    generation.current++;
-    current.current = 'idle';
-    setMode('idle');
-    try { await Capture.stop(); setMessage(reason); }
-    catch (e) { setError(String(e)); }
+  function stop(reason = 'Session stopped. The microphone is off.', discard = false): Promise<void> {
+    if (stopTask.current) return stopTask.current;
+    setStopping(true);
+    if (discard || current.current === 'enroll') { generation.current++; current.current = 'idle'; }
+    const task = (async () => {
+      try {
+        const tail = await Capture.stop();
+        setMessage('Microphone off. Finishing captured audio…');
+        if (!discard && current.current === 'test' && tail && tail.sessionId === captureId.current) {
+          if (!queue.current?.enqueue(tail)) { await queue.current?.drain(); queue.current?.enqueue(tail); }
+        }
+        await queue.current?.drain();
+        setMessage(reason);
+      } catch (e) { setError(String(e)); }
+      finally {
+        generation.current++; captureId.current = null; current.current = 'idle';
+        setMode('idle'); setLevel(0); setStopping(false); stopTask.current = null;
+      }
+    })();
+    stopTask.current = task;
+    return task;
   }
   async function handleChunk(chunk: AudioChunk) {
     const active = current.current;
-    if (active === 'idle') return;
-    if (processing.current) { setCounts(c => ({ ...c, skipped: c.skipped + 1 })); return; }
+    if (active === 'idle' || chunk.sessionId !== captureId.current) return;
     processing.current = true;
     const token = generation.current;
+    const processingStarted = Date.now();
     try {
-      // This is a basic energy gate, not a speech detector. Noise can pass it.
       if (rms(chunk.samples) < 0.008) {
         setCounts(c => ({ ...c, quiet: c.quiet + 1 }));
         setMessage('Audio was too quiet. Speak clearly near the phone.');
         return;
       }
-      const vector = await Speaker.embedding(chunk.samples, chunk.sampleRate);
+      const speech = await Speaker.speechOnly(chunk.samples);
+      if (!mounted.current || generation.current !== token) return;
+      if (speech.length < chunk.sampleRate * 2) {
+        setCounts(c => ({ ...c, quiet: c.quiet + 1 }));
+        setMessage('Less than two seconds of speech detected. Keep speaking naturally.');
+        return;
+      }
+      const vector = await Speaker.embedding(speech, chunk.sampleRate);
       if (!mounted.current || generation.current !== token) return;
       if (active === 'enroll') {
         samples.current.push(vector);
@@ -84,15 +114,15 @@ function Prototype() {
           Speaker.saveProfile(reference);
           profileRef.current = reference;
           setProfile(reference);
-          await stop('Voice profile saved on this phone. Start a test and take turns speaking.');
+          void stop('Voice profile saved on this phone. Start a test and take turns speaking.', true);
         } else setMessage(prompts[samples.current.length]);
       } else {
         if (!profileRef.current) throw new Error('Enroll your voice first');
         const score = cosine(profileRef.current, vector);
         setLastScore(score);
         if (score >= thresholdRef.current) {
-          const uri = Speaker.saveClip(chunk.samples, chunk.sampleRate);
-          const next = [{ uri, score, sequence: chunk.sequence }, ...clipList.current];
+          const uri = Speaker.saveClip(speech, chunk.sampleRate);
+          const next = [{ uri, score, sequence: chunk.sequence, seconds: speech.length / chunk.sampleRate }, ...clipList.current];
           for (const old of next.slice(12)) Speaker.deleteClip(old.uri);
           clipList.current = next.slice(0, 12);
           setClips(clipList.current);
@@ -106,22 +136,30 @@ function Prototype() {
     } catch (e) {
       if (mounted.current && token === generation.current) {
         setError(String(e));
-        await stop('Capture stopped after a processing error. Retry when ready.');
+        void stop('Capture stopped after a processing error. Retry when ready.', true);
       }
-    } finally { processing.current = false; }
+    } finally { processing.current = false; if (mounted.current) setLatency(Date.now() - processingStarted); }
   }
   const handler = useRef(handleChunk);
   handler.current = handleChunk;
   useEffect(() => {
     mounted.current = true;
-    try { const saved = Speaker.loadProfile(); profileRef.current = saved; setProfile(saved); Speaker.clearClips(); }
+    try {
+      const saved = Speaker.loadProfile(); profileRef.current = saved; setProfile(saved); Speaker.clearClips();
+      const savedThreshold = Speaker.loadThreshold(); thresholdRef.current = savedThreshold; setThreshold(savedThreshold);
+    }
     catch (e) { setError(String(e)); }
-    const chunks = Capture.addListener('onChunk', event => { void handler.current(event); });
-    const failures = Capture.addListener('onCaptureError', event => { setError(event.message); void stop('Microphone capture stopped.'); });
+    queue.current = new ProcessingQueue(event => handler.current(event));
+    const chunks = Capture.addListener('onChunk', event => {
+      if (current.current === 'idle' || event.sessionId !== captureId.current) return;
+      if (!queue.current?.enqueue(event)) setCounts(c => ({ ...c, skipped: c.skipped + 1 }));
+    });
+    const levels = Capture.addListener('onLevel', event => { if (current.current !== 'idle') setLevel(event.level); });
+    const failures = Capture.addListener('onCaptureError', event => { setError(event.message); void stop('Microphone capture stopped.', true); });
     const lifecycle = AppState.addEventListener('change', state => {
       if (state !== 'active' && current.current !== 'idle') void stop('Paused because you left the app. Start again to continue.');
     });
-    return () => { mounted.current = false; generation.current++; current.current = 'idle'; chunks.remove(); failures.remove(); lifecycle.remove(); void Capture.stop().catch(() => {}); };
+    return () => { mounted.current = false; generation.current++; current.current = 'idle'; chunks.remove(); levels.remove(); failures.remove(); lifecycle.remove(); void Capture.stop().catch(() => {}); };
   }, []);
   useEffect(() => {
     if (mode === 'idle') return;
@@ -136,7 +174,7 @@ function Prototype() {
     finally { action.current = false; setLoading(false); }
   }
   async function begin(next: Mode) {
-    if (action.current || processing.current || current.current !== 'idle') return;
+    if (action.current || processing.current || stopTask.current || current.current !== 'idle') return;
     action.current = true; setLoading(true); setError('');
     try {
       const permission = await AudioModule.requestRecordingPermissionsAsync();
@@ -144,11 +182,11 @@ function Prototype() {
       if (AppState.currentState !== 'active') throw new Error('Keep the app open to start recording.');
       await setAudioModeAsync({ allowsRecording: true, playsInSilentMode: true });
       generation.current++;
-      samples.current = []; setEnrolled(0); setLastScore(null);
+      samples.current = []; setEnrolled(0); setLastScore(null); setLatency(null);
       setCounts({ accepted: 0, rejected: 0, quiet: 0, skipped: 0 });
       started.current = Date.now(); setSeconds(0);
       current.current = next;
-      await Capture.start();
+      captureId.current = await Capture.start();
       if (AppState.currentState !== 'active' || current.current !== next) { await stop(); return; }
       setMode(next);
       setMessage(next === 'enroll' ? prompts[0] : 'Take turns speaking. First result arrives after 6 seconds.');
@@ -156,18 +194,29 @@ function Prototype() {
     finally { action.current = false; setLoading(false); }
   }
   const active = mode !== 'idle';
+  const locked = active || loading || stopping;
+  function changeThreshold(delta: number) {
+    try {
+      const value = Math.round(Math.max(0.2, Math.min(0.9, threshold + delta)) * 100) / 100;
+      Speaker.saveThreshold(value); thresholdRef.current = value; setThreshold(value);
+    } catch (e) { setError(String(e)); }
+  }
   const time = Math.floor(seconds / 60).toString().padStart(2, '0') + ':' + (seconds % 60).toString().padStart(2, '0');
   return <SafeAreaView style={styles.safe}><StatusBar barStyle="dark-content" />
+    {active && <KeepRecordingScreenAwake />}
     <ScrollView contentContainerStyle={styles.page}>
-      <View style={styles.header}><Text style={styles.brand}>AI Reminder</Text><Text style={styles.badge}>Voice prototype</Text></View>
+      <View style={styles.header}><Text style={styles.brand}>AI Reminder</Text><Text style={styles.badge}>Voice prototype 0.2</Text></View>
       <Text style={styles.title}>A little less{'\n'}to remember.</Text>
       <Text style={styles.intro}>Start with your voice. Enroll it, then check what the app keeps and what it ignores.</Text>
       <View style={styles.recorder}>
-        <Text style={styles.status}>{mode === 'enroll' ? 'Recording enrollment' : mode === 'test' ? 'Listening for your voice' : 'Microphone off'}</Text>
+        <Text style={styles.status}>{stopping ? 'Finishing captured speech' : mode === 'enroll' ? 'Recording enrollment' : mode === 'test' ? 'Listening for your voice' : 'Microphone off'}</Text>
         <Text accessibilityLabel={seconds + ' seconds'} style={styles.timer}>{time}</Text>
+        <View accessibilityLabel={'Microphone level ' + Math.round(level * 100)} style={{ height: 6, backgroundColor: '#DDE5F1', borderRadius: 3, marginBottom: 16 }}>
+          <View style={{ width: `${(active && !stopping) ? Math.min(100, level * 800) : 0}%`, height: 6, backgroundColor: '#258168', borderRadius: 3 }} />
+        </View>
         <View style={styles.track}>{[0, 1, 2].map(i => <View key={i} style={[styles.step, i < enrolled && styles.filled]} />)}</View>
         <Text style={styles.prompt}>{message}</Text>
-        {active ? <Button title="Stop microphone" onPress={() => { void stop(); }} /> : !ready ?
+        {active ? <Button title={stopping ? 'Finishing…' : 'Stop microphone'} disabled={stopping} onPress={() => { void stop(); }} /> : !ready ?
           <Button title={loading ? 'Preparing model…' : 'Download & load voice model'} disabled={loading} onPress={() => { void load(); }} /> :
           <View style={{ gap: 10 }}>
             <Button title={profile ? 'Start voice test' : 'Enroll my voice'} disabled={loading} onPress={() => { void begin(profile ? 'test' : 'enroll'); }} />
@@ -178,18 +227,19 @@ function Prototype() {
       {!!error && <View accessibilityRole="alert" style={styles.error}><Text style={{ color: '#982E35' }}>{error}</Text><Button title="Open app settings" secondary onPress={() => { void Linking.openSettings(); }} /></View>}
       <View style={styles.sectionHeader}><Text style={styles.sectionTitle}>Match sensitivity</Text><Text style={styles.score}>{threshold.toFixed(2)}</Text></View>
       <Text style={styles.muted}>Higher values reject more voices, including some of your own. This starting threshold needs testing.</Text>
-      <View style={styles.controls}><Button title="− 0.05" secondary disabled={active || loading || threshold <= 0.2} onPress={() => { const t = Math.max(0.2, threshold - 0.05); thresholdRef.current = t; setThreshold(t); }} /><Button title="+ 0.05" secondary disabled={active || loading || threshold >= 0.9} onPress={() => { const t = Math.min(0.9, threshold + 0.05); thresholdRef.current = t; setThreshold(t); }} /></View>
+      <View style={styles.controls}><Button title="− 0.05" secondary disabled={locked || threshold <= 0.2} onPress={() => changeThreshold(-0.05)} /><Button title="+ 0.05" secondary disabled={locked || threshold >= 0.9} onPress={() => changeThreshold(0.05)} /></View>
       <Text style={styles.label}>Last similarity: {lastScore === null ? 'Waiting for speech' : lastScore.toFixed(3)}</Text>
+      <Text style={styles.muted}>{latency === null ? 'Processing time appears after a window is checked.' : 'Last window processed in ' + (latency / 1000).toFixed(2) + ' seconds.'}</Text>
       <View style={styles.stats}>{Object.entries(counts).map(([name, count]) => <View key={name}><Text style={styles.count}>{count}</Text><Text style={styles.muted}>{name}</Text></View>)}</View>
       <View style={styles.sectionHeader}><Text style={styles.sectionTitle}>Accepted audio</Text><Text style={styles.muted}>{clips.length} / 12 kept</Text></View>
-      <Text style={styles.muted}>Six-second windows overlap by one second. Replay is available when the microphone is off.</Text>
+      <Text style={styles.muted}>Speech is detected before matching. Replay keeps speech from accepted windows, including overlap. Up to 12 clips are kept.</Text>
       {clips.length === 0 && <Text style={styles.empty}>Your matching audio will appear here after a voice test.</Text>}
       {clips.map(clip => <ClipPlayer key={clip.uri} clip={clip} disabled={active || loading} />)}
       <View style={{ gap: 10, marginTop: 16 }}>
         <Button title="Delete accepted audio" secondary disabled={active || loading || !clips.length} onPress={() => { try { Speaker.clearClips(); clipList.current = []; setClips([]); } catch (e) { setError(String(e)); } }} />
         <Button title="Delete my voice profile" secondary disabled={active || loading || !profile} onPress={() => { try { Speaker.removeProfile(); profileRef.current = null; setProfile(null); setEnrolled(0); } catch (e) { setError(String(e)); } }} />
       </View>
-      <Text style={styles.footer}>Keep this screen open. One speaker at a time. This prototype matches whole windows; it cannot separate overlapping voices. Quiet audio is skipped using volume, not speech detection. Matching can make mistakes.</Text>
+      <Text style={styles.footer}>Keep this app open. The screen stays awake while recording. Silero detects speech before voice matching; less than two seconds of speech is skipped. One speaker at a time: this prototype cannot separate overlapping voices. Matching can make mistakes.</Text>
     </ScrollView>
   </SafeAreaView>;
 }

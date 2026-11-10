@@ -1,0 +1,60 @@
+name: Android test APK
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - 'App.tsx'
+      - 'app.json'
+      - 'package*.json'
+      - 'src/**'
+      - 'modules/**'
+      - 'scripts/**'
+      - '.github/workflows/android-test-apk.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  apk:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v7.1.0
+        with:
+          node-version: '22'
+          cache: npm
+      - uses: actions/setup-java@v6.2.0
+        with:
+          distribution: temurin
+          java-version: '17'
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm test
+      - name: Configure side-by-side test app
+        run: |
+          node <<'NODE'
+          const fs = require('fs');
+          const config = JSON.parse(fs.readFileSync('app.json', 'utf8'));
+          config.expo.name = 'AI Reminder Test';
+          config.expo.android.package = 'com.aireminder.prototype.testing';
+          fs.writeFileSync('app.json', JSON.stringify(config, null, 2));
+          NODE
+      - name: Generate Android project
+        run: npx expo prebuild --platform android --no-install
+      - name: Build standalone ARM64 test APK
+        working-directory: android
+        run: |
+          chmod +x gradlew
+          ./gradlew :app:assembleRelease -PreactNativeArchitectures=arm64-v8a --no-daemon
+      - name: Upload installable test APK
+        uses: actions/upload-artifact@v7.0.2
+        with:
+          name: AI-Reminder-Test-0.2.0
+          path: android/app/build/outputs/apk/release/app-release.apk
+          if-no-files-found: error
+          retention-days: 14
