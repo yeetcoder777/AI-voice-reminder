@@ -2,6 +2,16 @@
 
 This is a working roadmap, not a promise that the proposed models or performance will work. Update it after each device experiment. Progress depends on evidence from the phone rather than fixed dates.
 
+## Latest build evidence: prototype 0.2
+
+Version 0.2 adds Silero speech detection before speaker verification, a bounded four-window processing queue, final-window handling on Stop, session identifiers, a microphone meter, saved sensitivity, and screen-awake recording. These are incremental capture improvements, not completion of the durable queue or hour-long background-session phases below.
+
+TypeScript, nine automated tests, Expo Doctor (20/20 locally), and Android bundling passed. GitHub Actions successfully compiled a standalone ARM64 test APK from commit 278c55c06642d55bc564645d84245f5a897385f9. It is named AI Reminder Test and uses a separate package so it can coexist with the EAS-signed app. Phone behavior and speaker/VAD accuracy remain unverified. Follow docs/PHONE_TEST.md for device experiments.
+
+Build and artifact: https://github.com/yeetcoder777/AI-voice-reminder/actions/runs/42830785741
+
+The EAS-signed 0.2 preview was also submitted (8778f75c-ef43-4185-80ec-980b256705a2); its last observed status was IN_QUEUE. The superseded 0.1 preview was canceled. The earlier replacement 0.1 development build finished successfully, confirming the Kotlin method-size workaround.
+
 ## 1. Product goal
 
 Build an Android app that lets the user explicitly start a conversation session, recognize one enrolled speaker, understand their instructions, save tasks, and deliver local reminders. The motivating example is remembering tasks given by the user's father.

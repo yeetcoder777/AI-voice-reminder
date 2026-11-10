@@ -69,6 +69,8 @@ Dependencies are installed and package-lock.json is included. Version 0.2 passed
 
 The previous 0.1 development build (10f8c0dc-f3f9-4261-a2a5-4052f8aeea43) finished successfully on EAS, confirming the native registration fix. Version 0.2 requires a new native APK because the microphone interface changed. Permissions, actual capture, voice accuracy, VAD quality, playback, visual layout, and device performance still require a phone test. npm reported five moderate dependency advisories; no breaking force-upgrades were applied.
 
+Version 0.2 native compilation also succeeded through [GitHub Actions](https://github.com/yeetcoder777/AI-voice-reminder/actions/runs/42830785741), from source commit 278c55c. The downloadable AI-Reminder-Test-0.2.0 artifact contains app-release.apk. On the local development machine the APK is saved under artifacts/AI-Reminder-Test-0.2.0.apk. See docs/PHONE_TEST.md for installation and device checks. GitHub keeps this workflow artifact for 14 days.
+
 The pinned expo-sherpa-onnx 0.0.8 wrapper declares itself experimental. Keep its install-time Kotlin workaround enabled.
 
 References: [Expo development builds](https://docs.expo.dev/develop/development-builds/introduction/), [Expo APK builds](https://docs.expo.dev/build-reference/apk/), [speaker wrapper](https://github.com/tirth0/expo-sherpa-onnx), [Sherpa speaker models](https://k2-fsa.github.io/sherpa/onnx/speaker-identification/).
