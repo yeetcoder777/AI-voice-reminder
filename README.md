@@ -1,8 +1,10 @@
-# AI Reminder — voice prototype 0.2.1
+# AI Reminder — voice prototype 0.2.2
 
 An Android-first Expo / React Native prototype for enrolling one voice and keeping audio windows that match it. No transcription, summaries, tasks, or reminder scheduling yet.
 
 Version 0.2.1 fixes model installation: Expo SDK 58 File.move() returns a promise and changes the source object's URI. Installation now awaits the move, checks the destination file, and cleans only the original temporary path. Version 0.2 could delete or race the downloaded file, producing a native "speaker embedding model not found" error. Install the 0.2.1 APK and retry model setup; no microphone-settings change is required for that error.
+
+Version 0.2.2 fixes a separate release-only JNI error, "Failed to get field ID for model". Inspection of the 0.2.1 APK showed that R8 renamed SpeakerEmbeddingExtractorConfig fields to a/b/c/d. The install hook now adds consumer keep rules for Sherpa's JNI-facing classes. CI inspects the finished APK's DEX tables and refuses to upload it unless speaker and VAD fields retain their required names and JVM types. No redownload fixes an obfuscated field; install the updated APK.
 
 ## Run on your Realme
 

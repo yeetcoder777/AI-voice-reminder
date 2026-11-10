@@ -51,10 +51,17 @@ jobs:
         run: |
           chmod +x gradlew
           ./gradlew :app:assembleRelease -PreactNativeArchitectures=arm64-v8a --no-daemon
+      - name: Verify packaged JNI fields survived R8
+        run: |
+          mkdir -p artifacts/dex
+          unzip -q android/app/build/outputs/apk/release/app-release.apk 'classes*.dex' -d artifacts/dex
+          node scripts/verify-sherpa-dex.cjs artifacts/dex
       - name: Upload installable test APK
+        # Run only after checking the release optimizer preserved the JNI contract.
+        if: success()
         uses: actions/upload-artifact@v7.0.2
         with:
-          name: AI-Reminder-Test-0.2.1
+          name: AI-Reminder-Test-0.2.2
           path: android/app/build/outputs/apk/release/app-release.apk
           if-no-files-found: error
           retention-days: 14

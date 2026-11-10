@@ -63,3 +63,11 @@ The phone exposed a model-not-found error during setup. The cause was our file-i
 The fix preserves the original temporary URI as an immutable string, awaits the move, verifies the destination, then cleans only that original temporary path through a fresh File object. Regression tests simulate an asynchronous move that mutates uri and check that both model files survive before native initialization. They also check cached/offline setup and failed download/move cleanup. These tests cover the file-lifecycle bug, not actual Android inference quality.
 
 Interview question: why is adding await alone insufficient if finally still calls delete() on the moved source object?
+
+## Version 0.2.2: release optimization and JNI field names
+
+After model installation succeeded, the phone reached native model creation and failed to find a field called model. We inspected the shipped APK's DEX field table: R8 had renamed the four SpeakerEmbeddingExtractorConfig fields to a, b, c, and d. The prebuilt native library still performs JNI GetFieldID lookups using the original names. A successful compilation cannot establish that these string-based lookups will work at runtime.
+
+The fix supplies consumer ProGuard rules to keep Sherpa's JNI-facing classes and all their members. This applies to both GitHub and EAS release builds through postinstall, without disabling optimization for the whole app. The CI build now extracts the actual APK's DEX and checks field names and descriptors for speaker config, VAD config, both VAD model configs and speech-segment results. The old APK fails that check at exactly the field named in the phone error.
+
+Interview question: why can a release build compile successfully while a native library fails to find a Kotlin field at runtime?

@@ -205,7 +205,7 @@ function Prototype() {
   return <SafeAreaView style={styles.safe}><StatusBar barStyle="dark-content" />
     {active && <KeepRecordingScreenAwake />}
     <ScrollView contentContainerStyle={styles.page}>
-      <View style={styles.header}><Text style={styles.brand}>AI Reminder</Text><Text style={styles.badge}>Voice prototype 0.2.1</Text></View>
+      <View style={styles.header}><Text style={styles.brand}>AI Reminder</Text><Text style={styles.badge}>Voice prototype 0.2.2</Text></View>
       <Text style={styles.title}>A little less{'\n'}to remember.</Text>
       <Text style={styles.intro}>Start with your voice. Enroll it, then check what the app keeps and what it ignores.</Text>
       <View style={styles.recorder}>
