@@ -2,6 +2,7 @@ import { Directory, File, Paths } from 'expo-file-system';
 import * as LegacyFS from 'expo-file-system/legacy';
 import { createSpeakerEmbeddingExtractor, createVAD, type SpeakerEmbeddingExtractorEngine, type VADEngine } from 'expo-sherpa-onnx';
 import { unit, wav } from './voiceMath';
+import { detectSpeech } from './speechDetection';
 
 export const MODEL = 'wespeaker_en_voxceleb_resnet34.onnx';
 const MODEL_BYTES = 26534365;
@@ -53,16 +54,7 @@ export async function initialize(onProgress: (message: string) => void) {
 /** Reset per overlapping window so shared audio is not fed to recurrent VAD twice. */
 export async function speechOnly(samples: number[]): Promise<number[]> {
   if (!vad) throw new Error('Load the speech detector first');
-  await vad.reset();
-  await vad.acceptWaveform(samples);
-  await vad.flush();
-  const speech: number[] = [];
-  while (!await vad.empty()) {
-    const segment = await vad.front();
-    for (const value of segment.samples) speech.push(value);
-    await vad.pop();
-  }
-  return speech;
+  return detectSpeech(vad, samples);
 }
 export function loadThreshold(): number {
   try { const value = JSON.parse(settings.textSync()).threshold; return typeof value === 'number' && value >= 0.2 && value <= 0.9 ? value : 0.5; }

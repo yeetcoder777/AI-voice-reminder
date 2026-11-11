@@ -55,6 +55,7 @@ function setup({ cached = false, failMove = false, failDownload = false } = {}) 
         },
       };
       if (name === './voiceMath') return {};
+      if (name === './speechDetection') return {};
       throw new Error('Unexpected import: ' + name);
     },
   };

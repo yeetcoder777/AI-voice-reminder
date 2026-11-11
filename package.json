@@ -1,6 +1,6 @@
 {
   "name": "ai-reminder-prototype",
-  "version": "0.2.2",
+  "version": "0.3.0",
   "private": true,
   "main": "index.ts",
   "scripts": {
@@ -8,7 +8,7 @@
     "android": "expo run:android",
     "typecheck": "tsc --noEmit",
     "doctor": "npx expo-doctor",
-    "test": "node --test tests/voiceMath.test.cjs tests/sherpaPatch.test.cjs tests/processingQueue.test.cjs tests/modelDownload.test.cjs tests/jniRelease.test.cjs",
+    "test": "node --test tests/voiceMath.test.cjs tests/sherpaPatch.test.cjs tests/processingQueue.test.cjs tests/modelDownload.test.cjs tests/jniRelease.test.cjs tests/speechDetection.test.cjs tests/enrollment.test.cjs",
     "postinstall": "node scripts/fix-sherpa-kotlin.cjs && node scripts/fix-sherpa-jni.cjs"
   },
   "dependencies": {

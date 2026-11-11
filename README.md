@@ -1,6 +1,8 @@
-# AI Reminder — voice prototype 0.2.2
+# AI Reminder — voice prototype 0.3.0
 
 An Android-first Expo / React Native prototype for enrolling one voice and keeping audio windows that match it. No transcription, summaries, tasks, or reminder scheduling yet.
+
+Version 0.3.0 corrects VAD framing: Sherpa now receives 512 samples per call rather than one six-second buffer. The latter can truncate detected speech boundaries in the pinned backend. The arbitrary RMS 0.008 prefilter is removed; no input, no speech, and short speech now have separate outcomes and measured level/duration diagnostics. Enrollment uses three independent recordings, each replayed and explicitly confirmed. The model is saved only after three confirmations from distinct capture sessions. Enroll again when testing this version.
 
 Version 0.2.1 fixes model installation: Expo SDK 58 File.move() returns a promise and changes the source object's URI. Installation now awaits the move, checks the destination file, and cleans only the original temporary path. Version 0.2 could delete or race the downloaded file, producing a native "speaker embedding model not found" error. Install the 0.2.1 APK and retry model setup; no microphone-settings change is required for that error.
 
@@ -37,19 +39,19 @@ An alternative GitHub Actions workflow builds a standalone ARM64 APK for testing
 ## First experiment
 
 1. Tap Download & load voice model. Initial setup downloads the speaker model (about 27 MB) and Silero speech detector (about 644 KB), with progress. Later starts use cached models; matching uses local inference.
-2. Tap Enroll my voice and grant microphone access. Keep speaking naturally, alone, for about 16 seconds. Follow the changing prompts. Three six-second windows create a reference embedding. Audio windows share one second.
+2. Tap Enroll my voice, then Record sample 1 of 3. Grant microphone access and speak naturally for six seconds. Recording stops automatically. Replay it, then tap Use sample 1. Repeat for samples 2 and 3. Retake a sample if needed. Each sample uses a fresh capture session; old profile data is not replaced by canceling enrollment.
 3. Tap Start voice test. Speak for at least six seconds. Watch the score and accepted/rejected counters. Stop, then replay accepted windows.
 4. Repeat with someone else's voice, one speaker at a time. Try both Hindi and English, then mixed speech. Test across different sentences so you measure voice matching rather than matching a memorized phrase.
 5. Adjust the threshold only while stopped. Start at 0.50 as an uncalibrated experiment. Log ten windows of your voice and ten of someone else's per language. Count own-voice rejections and other-voice acceptances. Choose a threshold based on those results; there is no guaranteed accuracy.
 6. After the model is downloaded, repeat in airplane mode to verify local operation (use the standalone preview APK to remove Metro's network dependency).
 
-Keep the app open; the screen stays awake while recording. Leaving the app stops capture and finishes pending processing. Silero VAD removes non-speech portions before matching, and windows with less than two seconds of detected speech are skipped. This does not distinguish speakers: speaker changes inside a window, overlapping voices, music, and TV can still cause errors. This is not source separation or biometric authentication. The English-trained speaker model's performance on Hindi must be measured on your samples.
+Keep the app open; the screen stays awake while recording. Leaving the app stops capture and finishes pending processing. Silero VAD removes non-speech portions before matching. Enrollment needs two seconds of detected speech, and test windows need one second. No input, no speech, and short speech are reported separately. This does not distinguish speakers: speaker changes inside a window, overlapping voices, music, and TV can still cause errors. This is not source separation or biometric authentication. The English-trained speaker model's performance on Hindi must be measured on your samples.
 
 ## What is stored
 
 - Two downloaded models, one voice-profile JSON, and your selected threshold in app documents.
 - Up to 12 accepted speech-only WAV clips in cache, with actual durations (overlap is audible on replay). Previous prototype clips are removed at app startup. Android may also evict cache.
-- Rejected windows and enrollment audio are never written to disk. They exist temporarily in memory while embeddings are computed.
+- Rejected test windows are not saved. One pending enrollment recording is cached for replay, then deleted on confirmation, retake, cancellation, or next app startup. Confirmed enrollment stores embeddings rather than all three raw recordings.
 - Delete accepted audio and Delete my voice profile are separate controls. Deleting the profile retains the downloaded model. Uninstalling clears app data.
 
 ## Architecture

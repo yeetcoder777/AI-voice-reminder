@@ -1,12 +1,13 @@
-# Test version 0.2 on your Realme
+# Test version 0.3.0 on your Realme
 
 Install the standalone preview APK. It does not need Metro, Expo Go, or the computer after installation. Reuse the existing app installation if Android accepts the update; this preserves the enrolled profile and model. Do not uninstall unless necessary, because that removes app data.
 
 ## First use
 
 1. Keep internet on and tap Download & load voice model. Wait for both the speaker model and speech detector to load. Setup shows download percentages.
-2. Tap Enroll my voice. Allow microphone access. Speak continuously and naturally through all three prompts, roughly 16 seconds or longer if pauses are skipped.
-3. The saved profile stays on this phone. Recording stops automatically when enrollment finishes.
+2. Tap Enroll my voice (or Record enrollment again), then Record sample 1 of 3. Allow microphone access and speak for six seconds until recording stops.
+3. Replay the recording. Tap Use sample 1, then record/replay/confirm sample 2 and sample 3. You may retake before confirming. The profile is saved only after all three confirmations. Each is a separate recording, with no shared enrollment audio.
+4. If a recording is not accepted, read the actual input dBFS, peak, and detected speech duration. Zero input, no detected speech, and short speech are separate causes. Do not interpret them as failed speaker identity matches.
 
 ## Voice matching
 
@@ -18,8 +19,8 @@ Install the standalone preview APK. It does not need Metro, Expo Go, or the comp
 
 ## Edge cases
 
-- Record about four seconds of speech, then Stop. If at least two seconds of speech are detected, the final partial window should be checked.
-- Record silence for ten seconds. It should increase the quiet counter and create no accepted clip.
+- Record about four seconds of speech, then Stop. If at least one second of speech is detected in a test, the final partial window should be checked. Enrollment requires two seconds.
+- Record silence for ten seconds. It should increase no input or no speech, depending on hardware noise, and create no accepted clip.
 - Adjust sensitivity while stopped. Restart the app and check that the value persists.
 - Leave the app while recording. It should stop the microphone and finish processing; this is not background-session support.
 - The screen should remain awake while recording. Replay should be disabled until recording and processing finish.

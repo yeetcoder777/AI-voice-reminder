@@ -71,3 +71,13 @@ After model installation succeeded, the phone reached native model creation and 
 The fix supplies consumer ProGuard rules to keep Sherpa's JNI-facing classes and all their members. This applies to both GitHub and EAS release builds through postinstall, without disabling optimization for the whole app. The CI build now extracts the actual APK's DEX and checks field names and descriptors for speaker config, VAD config, both VAD model configs and speech-segment results. The old APK fails that check at exactly the field named in the phone error.
 
 Interview question: why can a release build compile successfully while a native library fails to find a Kotlin field at runtime?
+
+## Version 0.3.0: analysis frames versus recording windows
+
+A six-second recording contains 96,000 samples at 16 kHz. That is a storage/processing window, not the VAD model's analysis frame. The pinned Sherpa implementation updates its speech boundaries once per acceptWaveform call and warns against very large inputs. Passing all six seconds in one call can place the start near the end and return only a short segment. We now feed 512 samples (32 ms) at a time, drain completed speech segments, and flush the final utterance. See src/speechDetection.ts and the upstream v1.12.29 voice-activity-detector.cc implementation.
+
+The former RMS cutoff rejected low-volume recordings before the speech model saw them. The label quiet also combined low amplitude with speech shorter than two seconds. We removed that cutoff and report the measured RMS dBFS, peak and detected duration, with separate no-input, no-speech and short-speech outcomes. This does not weaken the speaker identity threshold.
+
+Enrollment is now explicit: record one independent sample, replay it, then confirm. EnrollmentSession counts a capture session only once, requires three confirmations, and validates before changing progress. Confirmed samples use separate recordings rather than overlapping windows. Temporary enrollment audio is cached for review and deleted after use/retake/cancel/startup.
+
+CI also runs the matching native VAD backend against an official public speech recording and silence. That checks model behavior independently of the mocked JavaScript tests; neither check measures your Realme microphone or Hindi/English speaker accuracy.

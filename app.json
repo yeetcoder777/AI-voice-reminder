@@ -2,11 +2,11 @@
   "expo": {
     "name": "AI Reminder",
     "slug": "ai-reminder-prototype",
-    "version": "0.2.2",
+    "version": "0.3.0",
     "orientation": "portrait",
     "userInterfaceStyle": "light",
     "android": {
-      "versionCode": 4,
+      "versionCode": 5,
       "package": "com.aireminder.prototype",
       "permissions": [
         "android.permission.RECORD_AUDIO",
