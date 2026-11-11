@@ -6,6 +6,8 @@ Version 0.2.1 fixes model installation: Expo SDK 58 File.move() returns a promis
 
 Version 0.2.2 fixes a separate release-only JNI error, "Failed to get field ID for model". Inspection of the 0.2.1 APK showed that R8 renamed SpeakerEmbeddingExtractorConfig fields to a/b/c/d. The install hook now adds consumer keep rules for Sherpa's JNI-facing classes. CI inspects the finished APK's DEX tables and refuses to upload it unless speaker and VAD fields retain their required names and JVM types. No redownload fixes an obfuscated field; install the updated APK.
 
+The corrected [0.2.2 build](https://github.com/yeetcoder777/AI-voice-reminder/actions/runs/42869039958) succeeded and passed packaged-field verification. Use artifacts/AI-Reminder-Test-0.2.2.apk locally or download AI-Reminder-Test-0.2.2 from the workflow artifacts. See docs/BUILD_0.2.2.md for exact build evidence and phone retest steps.
+
 ## Run on your Realme
 
 Use Node.js 22 LTS or newer supported by Expo SDK 58. Open PowerShell in this folder:
