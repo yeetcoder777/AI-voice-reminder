@@ -8,19 +8,20 @@ import sherpa_onnx
 folder = Path('artifacts/vad-smoke')
 folder.mkdir(parents=True, exist_ok=True)
 base = 'https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/'
-for name in ('silero_vad.onnx', 'Obama.wav'):
+for name in ('silero_vad.onnx', 'itn-zh-number.wav'):
     target = folder / name
     if not target.exists():
         with urllib.request.urlopen(base + name, timeout=90) as response:
             target.write_bytes(response.read())
 
-audio, rate = sf.read(folder / 'Obama.wav', dtype='float32', always_2d=True)
+audio, rate = sf.read(folder / 'itn-zh-number.wav', dtype='float32', always_2d=True)
 audio = audio.mean(axis=1)
 if rate != 16000:
     audio = np.interp(np.arange(round(len(audio) * 16000 / rate)) / 16000,
                       np.arange(len(audio)) / rate, audio).astype(np.float32)
 audio = np.asarray(audio[:96000], dtype=np.float32)
 assert len(audio) == 96000, 'Reference must contain at least six seconds'
+print(f'Reference: rate={rate}; rms={np.sqrt(np.mean(audio ** 2)):.6f}; peak={np.max(np.abs(audio)):.6f}', flush=True)
 
 def detected_seconds(samples, frame_size):
     config = sherpa_onnx.VadModelConfig()
