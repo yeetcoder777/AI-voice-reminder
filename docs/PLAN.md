@@ -2,7 +2,13 @@
 
 This is a working roadmap, not a promise that the proposed models or performance will work. Update it after each device experiment. Progress depends on evidence from the phone rather than fixed dates.
 
-## Latest build evidence: prototype 0.2
+## Latest build evidence: prototype 0.3.0
+
+After the user reported that all voices were labeled quiet, version 0.3.0 removed the absolute RMS cutoff and corrected VAD feeding to 512-sample frames. Enrollment now uses three separate recordings with replay and explicit confirmation. Input, VAD-duration and short-speech outcomes are visible separately. TypeScript, 21 tests, native reference-audio VAD checks, native APK compilation and packaged JNI-field verification passed. See docs/BUILD_0.3.0.md for measured results and the actual APK. Realme retesting is still required; this is not completion of durable capture or hour-long background support.
+
+Successful build: https://github.com/yeetcoder777/AI-voice-reminder/actions/runs/43009517027
+
+## Earlier build evidence: prototype 0.2
 
 Version 0.2 adds Silero speech detection before speaker verification, a bounded four-window processing queue, final-window handling on Stop, session identifiers, a microphone meter, saved sensitivity, and screen-awake recording. These are incremental capture improvements, not completion of the durable queue or hour-long background-session phases below.
 
